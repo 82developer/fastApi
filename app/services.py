@@ -1,24 +1,27 @@
-from typing import Protocol, Optional, List
-from app.repositories import IUserRepository, User
+# app/services.py
 
-class IUserService(Protocol):
-    def list_users(self) -> List[User]:...
-    def create_user(self, name: str) -> User:...
-    def find(self, user_id: int) -> Optional[User]: ...
-
-class UserService(IUserService):
-    def __init__(self, repo: IUserRepository):
-        self._repo = repo
-    
-    def list_users(self) -> List[User]:
-        return self._repo.get_all()  
-
-    def create_user(self, name: str) -> User:
-        return self._repo.add(name)
-
-    def find(self, user_id: int) -> Optional[User]:
-        return self._repo.get_by_id(user_id)
+from typing import List, Dict
 
 
+class UserService:
+    """
+    Simple service that manages users in memory.
+    """
 
+    def __init__(self) -> None:
+        self._users: List[Dict[str, str]] = [
+            {"id": "1", "name": "Alice", "email": "alice@example.com"},
+            {"id": "2", "name": "Bob", "email": "bob@example.com"},
+        ]
 
+    def get_all_users(self) -> List[Dict[str, str]]:
+        return self._users
+
+    def get_user_by_id(self, user_id: str) -> Dict[str, str] | None:
+        return next((u for u in self._users if u["id"] == user_id), None)
+
+    def create_user(self, name: str, email: str) -> Dict[str, str]:
+        new_id = str(len(self._users) + 1)
+        user = {"id": new_id, "name": name, "email": email}
+        self._users.append(user)
+        return user
