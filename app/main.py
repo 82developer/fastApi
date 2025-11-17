@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 from app.api.v1.users import router as users_router
+from app.api.v1.products import router as products_router
 from app.core.container import AppContainer
 
 
@@ -22,10 +23,14 @@ def create_app() -> FastAPI:
     app.state.container = container
 
     # Wire the container with the FastAPI app modules
-    container.wire(modules=["app.api.v1.users"])
+    container.wire(modules=[
+        "app.api.v1.users",
+        "app.api.v1.products"
+        ])
 
     # Include routers
     app.include_router(users_router)
+    app.include_router(products_router)
 
     return app
 
