@@ -7,23 +7,24 @@ from dependency_injector.wiring import inject, Provide
 
 from app.core.container import AppContainer
 from app.core.mediator import Mediator
-from app.application.users.messages import (
-    CreateUserCommand,
-    GetUserByIdQuery,
-    ListUsersQuery,
-)
-from app.domain.users.entities import User
+from app.application.users.commands import CreateUserCommand
+from app.application.users.queries import GetUserByIdQuery, ListUsersQuery
+from app.application.users.dtos import UserDto
 
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-# ----- Pydantic Schemas ----- #
+# ----- Pydantic schemas for HTTP layer ----- #
 
 class UserResponse(BaseModel):
     id: int
     name: str
     email: str
+
+    @classmethod
+    def from_dto(cls, dto: UserDto) -> "UserResponse":
+        return cls(id=dto.id, name=dto.name, email=dto.email)
 
 
 class CreateUserRequest(BaseModel):
@@ -31,11 +32,7 @@ class CreateUserRequest(BaseModel):
     email: str
 
 
-def to_user_response(user: User) -> UserResponse:
-    return UserResponse(id=user.id, name=user.name, email=user.email)
-
-
-# ----- Endpoints using Mediator ----- #
+# ----- Endpoints using Mediator (CQRS) ----- #
 
 @router.post("/", response_model=int, status_code=201)
 @inject
@@ -44,8 +41,8 @@ async def create_user(
     mediator: Mediator = Depends(Provide[AppContainer.mediator]),
 ) -> int:
     """
-    Command endpoint: create user.
-    CQRS: write side -> CreateUserCommand.
+    Command endpoint: create a new user.
+    CQRS: write side via CreateUserCommand.
     """
     cmd = CreateUserCommand(name=payload.name, email=payload.email)
     user_id = await mediator.send(cmd)
@@ -58,12 +55,12 @@ async def list_users(
     mediator: Mediator = Depends(Provide[AppContainer.mediator]),
 ) -> List[UserResponse]:
     """
-    Query endpoint: list users.
-    CQRS: read side -> ListUsersQuery.
+    Query endpoint: list all users.
+    CQRS: read side via ListUsersQuery.
     """
     query = ListUsersQuery()
-    users = await mediator.send(query)
-    return [to_user_response(u) for u in users]
+    dtos = await mediator.send(query)
+    return [UserResponse.from_dto(dto) for dto in dtos]
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -74,10 +71,12 @@ async def get_user(
 ) -> UserResponse:
     """
     Query endpoint: get user by id.
-    CQRS: read side -> GetUserByIdQuery.
+    CQRS: read side via GetUserByIdQuery.
     """
     query = GetUserByIdQuery(user_id=user_id)
-    user = await mediator.send(query)
-    if user is None:
+    dto = await mediator.send(query)
+
+    if dto is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return to_user_response(user)
+
+    return UserResponse.from_dto(dto)

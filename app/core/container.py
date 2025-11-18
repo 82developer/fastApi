@@ -1,5 +1,6 @@
 from dependency_injector import containers, providers
 
+from app.core.config import Settings
 from app.core.mediator import Mediator
 from app.domain.users.repositories import UserRepository
 from app.infrastructure.users.repositories import InMemoryUserRepository
@@ -8,30 +9,28 @@ from app.application.users.handlers import (
     GetUserByIdHandler,
     ListUsersHandler,
 )
-from app.application.users.messages import (
-    CreateUserCommand,
-    GetUserByIdQuery,
-    ListUsersQuery,
-)
+from app.application.users.commands import CreateUserCommand
+from app.application.users.queries import GetUserByIdQuery, ListUsersQuery
 
 
 class AppContainer(containers.DeclarativeContainer):
-    """
-    Application DI container.
-    """
+    """Application DI container."""
 
     wiring_config = containers.WiringConfiguration(
         modules=[
-            "app.api.v1.users",  # modules where we will inject Mediator
+            "app.api.v1.users",   # modules where we'll inject Mediator/Settings
         ]
     )
 
-    # Repositories
+    # --- Configuration ---
+    settings = providers.Singleton(Settings)
+
+    # --- Repositories ---
     user_repository: providers.Provider[UserRepository] = providers.Singleton(
         InMemoryUserRepository
     )
 
-    # Handlers (each handler gets repo injected)
+    # --- Handlers ---
     create_user_handler = providers.Factory(
         CreateUserHandler,
         repo=user_repository,
@@ -47,5 +46,5 @@ class AppContainer(containers.DeclarativeContainer):
         repo=user_repository,
     )
 
-    # Mediator
+    # --- Mediator ---
     mediator = providers.Singleton(Mediator)

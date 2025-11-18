@@ -5,16 +5,16 @@ from .entities import User
 
 
 class UserRepository(ABC):
-    """Abstraction of user persistence."""
+    """Abstraction of user persistence (write + read)."""
 
     @abstractmethod
-    def get_all(self) -> List[User]:
+    async def get_all(self) -> List[User]:
         ...
 
     @abstractmethod
-    def get_by_id(self, user_id: int) -> Optional[User]:
+    async def get_by_id(self, user_id: int) -> Optional[User]:
         ...
 
     @abstractmethod
-    def add(self, name: str, email: str) -> User:
+    async def add(self, name: str, email: str) -> User:
         ...
