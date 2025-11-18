@@ -1,7 +1,4 @@
-# app/domain/users/entities.py
-
 from dataclasses import dataclass
-
 
 @dataclass
 class User:

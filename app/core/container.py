@@ -1,41 +1,51 @@
-# app/core/container.py
-
 from dependency_injector import containers, providers
 
-from app.core.config import Settings
-from app.domain.users.services import UserService
-from app.domain.products.services import ProductService
+from app.core.mediator import Mediator
+from app.domain.users.repositories import UserRepository
 from app.infrastructure.users.repositories import InMemoryUserRepository
-from app.infrastructure.products.repositories import InMemoryProductRepository
+from app.application.users.handlers import (
+    CreateUserHandler,
+    GetUserByIdHandler,
+    ListUsersHandler,
+)
+from app.application.users.messages import (
+    CreateUserCommand,
+    GetUserByIdQuery,
+    ListUsersQuery,
+)
 
 
 class AppContainer(containers.DeclarativeContainer):
     """
-    Main application container.
-    It composes all services, repositories, config, etc.
+    Application DI container.
     """
 
     wiring_config = containers.WiringConfiguration(
         modules=[
-            "app.api.v1.users",  # modules where we will inject dependencies
-            "app.api.v1.products",
+            "app.api.v1.users",  # modules where we will inject Mediator
         ]
     )
 
-    # --- Configuration ---
-    config = providers.Singleton(Settings)
-
-    # --- Repositories ---
-    user_repository = providers.Singleton(InMemoryUserRepository)
-    product_repository = providers.Singleton(InMemoryProductRepository)
-
-    # --- Services ---
-    user_service = providers.Factory(
-        UserService,
-        repository=user_repository,
+    # Repositories
+    user_repository: providers.Provider[UserRepository] = providers.Singleton(
+        InMemoryUserRepository
     )
 
-    product_service = providers.Factory(
-        ProductService,
-        repository=product_repository,
-        )
+    # Handlers (each handler gets repo injected)
+    create_user_handler = providers.Factory(
+        CreateUserHandler,
+        repo=user_repository,
+    )
+
+    get_user_by_id_handler = providers.Factory(
+        GetUserByIdHandler,
+        repo=user_repository,
+    )
+
+    list_users_handler = providers.Factory(
+        ListUsersHandler,
+        repo=user_repository,
+    )
+
+    # Mediator
+    mediator = providers.Singleton(Mediator)

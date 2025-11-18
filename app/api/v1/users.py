@@ -1,5 +1,3 @@
-# app/api/v1/users.py
-
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,8 +6,13 @@ from pydantic import BaseModel
 from dependency_injector.wiring import inject, Provide
 
 from app.core.container import AppContainer
+from app.core.mediator import Mediator
+from app.application.users.messages import (
+    CreateUserCommand,
+    GetUserByIdQuery,
+    ListUsersQuery,
+)
 from app.domain.users.entities import User
-from app.domain.users.services import UserService
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -22,54 +25,59 @@ class UserResponse(BaseModel):
     name: str
     email: str
 
-    @classmethod
-    def from_entity(cls, user: User) -> "UserResponse":
-        return cls(id=user.id, name=user.name, email=user.email)
 
-
-class UserCreateRequest(BaseModel):
+class CreateUserRequest(BaseModel):
     name: str
     email: str
 
 
-# ----- Endpoints with DI ----- #
+def to_user_response(user: User) -> UserResponse:
+    return UserResponse(id=user.id, name=user.name, email=user.email)
+
+
+# ----- Endpoints using Mediator ----- #
+
+@router.post("/", response_model=int, status_code=201)
+@inject
+async def create_user(
+    payload: CreateUserRequest,
+    mediator: Mediator = Depends(Provide[AppContainer.mediator]),
+) -> int:
+    """
+    Command endpoint: create user.
+    CQRS: write side -> CreateUserCommand.
+    """
+    cmd = CreateUserCommand(name=payload.name, email=payload.email)
+    user_id = await mediator.send(cmd)
+    return user_id
+
 
 @router.get("/", response_model=List[UserResponse])
 @inject
-def list_users(
-    service: UserService = Depends(Provide[AppContainer.user_service]),
-):
+async def list_users(
+    mediator: Mediator = Depends(Provide[AppContainer.mediator]),
+) -> List[UserResponse]:
     """
-    GET /users
-    Returns all users.
+    Query endpoint: list users.
+    CQRS: read side -> ListUsersQuery.
     """
-    users = service.list_users()
-    return [UserResponse.from_entity(u) for u in users]
+    query = ListUsersQuery()
+    users = await mediator.send(query)
+    return [to_user_response(u) for u in users]
 
 
 @router.get("/{user_id}", response_model=UserResponse)
 @inject
-def get_user(
+async def get_user(
     user_id: int,
-    service: UserService = Depends(Provide[AppContainer.user_service]),
-):
+    mediator: Mediator = Depends(Provide[AppContainer.mediator]),
+) -> UserResponse:
     """
-    GET /users/{user_id}
+    Query endpoint: get user by id.
+    CQRS: read side -> GetUserByIdQuery.
     """
-    user = service.get_user(user_id)
+    query = GetUserByIdQuery(user_id=user_id)
+    user = await mediator.send(query)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserResponse.from_entity(user)
-
-
-@router.post("/", response_model=UserResponse, status_code=201)
-@inject
-def create_user(
-    payload: UserCreateRequest,
-    service: UserService = Depends(Provide[AppContainer.user_service]),
-):
-    """
-    POST /users
-    """
-    user = service.create_user(name=payload.name, email=payload.email)
-    return UserResponse.from_entity(user)
+    return to_user_response(user)

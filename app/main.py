@@ -1,36 +1,38 @@
-# app/main.py
-
 from fastapi import FastAPI
 
 from app.api.v1.users import router as users_router
-from app.api.v1.products import router as products_router
 from app.core.container import AppContainer
+from app.core.mediator import Mediator
+from app.application.users.messages import (
+    CreateUserCommand,
+    GetUserByIdQuery,
+    ListUsersQuery,
+)
 
 
 def create_app() -> FastAPI:
     container = AppContainer()
 
-    # If you need to customize config:
-    # settings = container.config()
-    # settings.environment = "production"   # or from elsewhere
-
     app = FastAPI(
-        title="Professional FastAPI + dependency_injector App",
+        title="CQRS + Mediator + DI example",
         version="1.0.0",
     )
 
-    # Attach container to app for access in middlewares, tests, etc.
+    # Attach container to app (optional but useful)
     app.state.container = container
 
-    # Wire the container with the FastAPI app modules
-    container.wire(modules=[
-        "app.api.v1.users",
-        "app.api.v1.products"
-        ])
+    # Wire DI into FastAPI modules
+    container.wire(modules=["app.api.v1.users"])
 
-    # Include routers
+    # Register handlers into mediator
+    mediator: Mediator = container.mediator()
+
+    mediator.register(CreateUserCommand, container.create_user_handler)
+    mediator.register(GetUserByIdQuery, container.get_user_by_id_handler)
+    mediator.register(ListUsersQuery, container.list_users_handler)
+
+    # Routers
     app.include_router(users_router)
-    app.include_router(products_router)
 
     return app
 
